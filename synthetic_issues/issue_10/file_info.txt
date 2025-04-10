@@ -1,0 +1,3 @@
+File Path: /workspace/matplotlib/lib/matplotlib/legend.py
+Number of Line Changes: 28
+Issue Type: Legend Initialization Bug

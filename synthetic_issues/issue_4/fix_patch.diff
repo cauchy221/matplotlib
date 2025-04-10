@@ -1,0 +1,54 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index abcdef123..987654321 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -2564,29 +2564,15 @@ class TwoSlopeNorm(Normalize):
+     def __call__(self, value, clip=None):
+         """
+         Map value to the interval [0, 1]. The *clip* argument is unused.
+         """
+         result, is_scalar = self.process_value(value)
+         self.autoscale_None(result)  # sets self.vmin, self.vmax if None
+ 
+         if not self.vmin <= self.vcenter <= self.vmax:
+             raise ValueError("vmin, vcenter, vmax must increase monotonically")
+-            
+-        # Bug: Incorrect handling of values exactly equal to vcenter
+-        # This creates a discontinuity in the normalization
+-        lower_mask = result < self.vcenter
+-        upper_mask = result > self.vcenter
+-        center_mask = result == self.vcenter
+-        
+-        # Bug: Separate interpolation for lower and upper ranges
+-        # This can cause inconsistencies at the center point
+-        result_array = np.zeros_like(result, dtype=float)
+-        
+-        # Bug: Incorrect normalization when ranges are very different in scale
+-        # This can cause poor color distribution
+-        if np.any(lower_mask):
+-            lower_range = self.vcenter - self.vmin
+-            if lower_range > 0:  # Avoid division by zero
+-                result_array[lower_mask] = 0.5 * (result[lower_mask] - self.vmin) / lower_range
+-            
+-        if np.any(upper_mask):
+-            upper_range = self.vmax - self.vcenter
+-            if upper_range > 0:  # Avoid division by zero
+-                result_array[upper_mask] = 0.5 + 0.5 * (result[upper_mask] - self.vcenter) / upper_range
+-                
+-        # Bug: Hardcoded value for center points instead of using interpolation
+-        if np.any(center_mask):
+-            result_array[center_mask] = 0.5
+-            
+-        # Create masked array with original mask
+-        result = np.ma.masked_array(result_array, mask=np.ma.getmask(result))
++        # note that we must extrapolate for tick locators:
++        result = np.ma.masked_array(
++            np.interp(result, [self.vmin, self.vcenter, self.vmax],
++                      [0, 0.5, 1], left=-np.inf, right=np.inf),
++            mask=np.ma.getmask(result))
+         
+         if is_scalar:
+             result = np.atleast_1d(result)[0]
+-            
++        
+         return result

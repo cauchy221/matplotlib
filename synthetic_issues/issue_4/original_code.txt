@@ -1,0 +1,17 @@
+    def __call__(self, value, clip=None):
+        """
+        Map value to the interval [0, 1]. The *clip* argument is unused.
+        """
+        result, is_scalar = self.process_value(value)
+        self.autoscale_None(result)  # sets self.vmin, self.vmax if None
+
+        if not self.vmin <= self.vcenter <= self.vmax:
+            raise ValueError("vmin, vcenter, vmax must increase monotonically")
+        # note that we must extrapolate for tick locators:
+        result = np.ma.masked_array(
+            np.interp(result, [self.vmin, self.vcenter, self.vmax],
+                      [0, 0.5, 1], left=-np.inf, right=np.inf),
+            mask=np.ma.getmask(result))
+        if is_scalar:
+            result = np.atleast_1d(result)[0]
+        return result

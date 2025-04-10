@@ -1,0 +1,36 @@
+    def format_data(self, value):
+        # docstring inherited
+        # Bug: Doesn't handle zero or very small values properly
+        if value == 0:
+            return "0"
+            
+        # Bug: Incorrect handling of very small values
+        try:
+            e = math.floor(math.log10(abs(value)))
+        except (ValueError, OverflowError):
+            # If value is too small for log10, just return the string representation
+            return str(value)
+            
+        # Bug: Incorrect rounding of significand can cause precision loss
+        s = value / 10**e
+        
+        # Bug: Doesn't properly handle integer significands
+        if abs(s - round(s)) < 1e-10:
+            significand = self._format_maybe_minus_and_locale("%d", int(round(s)))
+        else:
+            # Bug: Fixed precision can cause truncation or excessive digits
+            significand = self._format_maybe_minus_and_locale("%.6g", s)
+            
+        if e == 0:
+            return significand
+            
+        exponent = self._format_maybe_minus_and_locale("%d", e)
+        
+        # Bug: Incorrect handling of special case where s == 1
+        if self._useMathText or self._usetex:
+            exponent = "10^{%s}" % exponent
+            # Bug: Missing the special case for s == 1
+            return rf"{significand} \times {exponent}"
+        else:
+            # Bug: Doesn't properly format the exponent for negative values
+            return f"{significand}e{exponent}"

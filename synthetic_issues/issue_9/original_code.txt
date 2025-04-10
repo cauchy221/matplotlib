@@ -1,0 +1,64 @@
+    def update_positions(self, renderer):
+        """
+        Update the pixel positions of the annotation text and the arrow patch.
+        """
+        # generate transformation
+        self.set_transform(self._get_xy_transform(renderer, self.anncoords))
+
+        arrowprops = self.arrowprops
+        if arrowprops is None:
+            return
+
+        bbox = Text.get_window_extent(self, renderer)
+
+        arrow_end = x1, y1 = self._get_position_xy(renderer)  # Annotated pos.
+
+        ms = arrowprops.get("mutation_scale", self.get_size())
+        self.arrow_patch.set_mutation_scale(ms)
+
+        if "arrowstyle" not in arrowprops:
+            # Approximately simulate the YAArrow.
+            shrink = arrowprops.get('shrink', 0.0)
+            width = arrowprops.get('width', 4)
+            headwidth = arrowprops.get('headwidth', 12)
+            headlength = arrowprops.get('headlength', 12)
+
+            # NB: ms is in pts
+            stylekw = dict(head_length=headlength / ms,
+                           head_width=headwidth / ms,
+                           tail_width=width / ms)
+
+            self.arrow_patch.set_arrowstyle('simple', **stylekw)
+
+            # using YAArrow style:
+            # pick the corner of the text bbox closest to annotated point.
+            xpos = [(bbox.x0, 0), ((bbox.x0 + bbox.x1) / 2, 0.5), (bbox.x1, 1)]
+            ypos = [(bbox.y0, 0), ((bbox.y0 + bbox.y1) / 2, 0.5), (bbox.y1, 1)]
+            x, relposx = min(xpos, key=lambda v: abs(v[0] - x1))
+            y, relposy = min(ypos, key=lambda v: abs(v[0] - y1))
+            self._arrow_relpos = (relposx, relposy)
+            r = np.hypot(y - y1, x - x1)
+            shrink_pts = shrink * r / renderer.points_to_pixels(1)
+            self.arrow_patch.shrinkA = self.arrow_patch.shrinkB = shrink_pts
+
+        # adjust the starting point of the arrow relative to the textbox.
+        # TODO : Rotation needs to be accounted.
+        arrow_begin = bbox.p0 + bbox.size * self._arrow_relpos
+        # The arrow is drawn from arrow_begin to arrow_end.  It will be first
+        # clipped by patchA and patchB.  Then it will be shrunk by shrinkA and
+        # shrinkB (in points).  If patchA is not set, self.bbox_patch is used.
+        self.arrow_patch.set_positions(arrow_begin, arrow_end)
+
+        if "patchA" in arrowprops:
+            patchA = arrowprops["patchA"]
+        elif self._bbox_patch:
+            patchA = self._bbox_patch
+        elif self.get_text() == "":
+            patchA = None
+        else:
+            pad = renderer.points_to_pixels(4)
+            patchA = Rectangle(
+                xy=(bbox.x0 - pad / 2, bbox.y0 - pad / 2),
+                width=bbox.width + pad, height=bbox.height + pad,
+                transform=IdentityTransform(), clip_on=False)
+        self.arrow_patch.set_patchA(patchA)

@@ -1,0 +1,11 @@
+    def rotate_deg_around(self, x, y, degrees):
+        """
+        Add a rotation (in degrees) around the point (x, y) in place.
+
+        Returns *self*, so this method can easily be chained with more
+        calls to :meth:`rotate`, :meth:`rotate_deg`, :meth:`translate`
+        and :meth:`scale`.
+        """
+        # Cast to float to avoid wraparound issues with uint8's
+        x, y = float(x), float(y)
+        return self.translate(-x, -y).rotate_deg(degrees).translate(x, y)

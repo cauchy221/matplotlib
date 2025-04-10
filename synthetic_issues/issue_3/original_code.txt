@@ -1,0 +1,15 @@
+    def format_data(self, value):
+        # docstring inherited
+        e = math.floor(math.log10(abs(value)))
+        s = round(value / 10**e, 10)
+        significand = self._format_maybe_minus_and_locale(
+            "%d" if s % 1 == 0 else "%1.10g", s)
+        if e == 0:
+            return significand
+        exponent = self._format_maybe_minus_and_locale("%d", e)
+        if self._useMathText or self._usetex:
+            exponent = "10^{%s}" % exponent
+            return (exponent if s == 1  # reformat 1x10^y as 10^y
+                    else rf"{significand} \times {exponent}")
+        else:
+            return f"{significand}e{exponent}"

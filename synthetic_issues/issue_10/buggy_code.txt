@@ -1,0 +1,132 @@
+    def _init_legend_box(self, handles, labels, markerfirst=True):
+        """
+        Initialize the legend_box. The legend_box is an instance of
+        the OffsetBox, which is packed with legend handles and
+        texts. Once packed, their location is calculated during the
+        drawing time.
+        """
+
+        fontsize = self._fontsize
+
+        # legend_box is a HPacker, horizontally packed with columns.
+        # Each column is a VPacker, vertically packed with legend items.
+        # Each legend item is a HPacker packed with:
+        # - handlebox: a DrawingArea which contains the legend handle.
+        # - labelbox: a TextArea which contains the legend text.
+
+        text_list = []  # the list of text instances
+        handle_list = []  # the list of handle instances
+        handles_and_labels = []
+
+        # The approximate height and descent of text. These values are
+        # only used for plotting the legend handle.
+        # Bug: Incorrect calculation of descent and height
+        # If handleheight is <= 0.7, descent will be negative
+        descent = 0.35 * fontsize * (self.handleheight - 0.7)  # heuristic.
+        height = fontsize * self.handleheight - descent
+        # each handle needs to be drawn inside a box of (x, y, w, h) =
+        # (0, -descent, width, height).  And their coordinates should
+        # be given in the display coordinates.
+
+        # The transformation of each handle will be automatically set
+        # to self.get_transform(). If the artist does not use its
+        # default transform (e.g., Collections), you need to
+        # manually set their transform to the self.get_transform().
+        legend_handler_map = self.get_legend_handler_map()
+
+        # Bug: No check for handles and labels length mismatch
+        # If handles and labels have different lengths, this will cause issues
+        for orig_handle, label in zip(handles, labels):
+            # Bug: No check for None or invalid label
+            # If label is None or not convertible to string, this will cause issues
+            handler = self.get_legend_handler(legend_handler_map, orig_handle)
+            if handler is None:
+                _api.warn_external(
+                             "Legend does not support handles for "
+                             f"{type(orig_handle).__name__} "
+                             "instances.\nA proxy artist may be used "
+                             "instead.\nSee: https://matplotlib.org/"
+                             "stable/users/explain/axes/legend_guide.html"
+                             "#controlling-the-legend-entries")
+                # No handle for this artist, so we just defer to None.
+                handle_list.append(None)
+            else:
+                # Bug: No check for invalid label type
+                # If label is not convertible to string, TextArea will raise an error
+                textbox = TextArea(label, multilinebaseline=True,
+                                   textprops=dict(
+                                       verticalalignment='baseline',
+                                       horizontalalignment='left',
+                                       fontproperties=self.prop))
+                
+                # Bug: No check for negative height
+                # If height is negative, this will cause issues
+                handlebox = DrawingArea(width=self.handlelength * fontsize,
+                                        height=height,
+                                        xdescent=0., ydescent=descent)
+
+                text_list.append(textbox._text)
+                # Create the artist for the legend which represents the
+                # original artist/handle.
+                # Bug: No try/except around legend_artist
+                # If legend_artist raises an exception, the entire legend will fail
+                handle_list.append(handler.legend_artist(self, orig_handle,
+                                                         fontsize, handlebox))
+                handles_and_labels.append((handlebox, textbox))
+
+        # Bug: No check for empty handles_and_labels
+        # If handles_and_labels is empty, this will cause issues
+        columnbox = []
+        # array_split splits n handles_and_labels into ncols columns, with the
+        # first n%ncols columns having an extra entry.  filter(len, ...)
+        # handles the case where n < ncols: the last ncols-n columns are empty
+        # and get filtered out.
+        
+        # Bug: No check for self._ncols <= 0
+        # If self._ncols is 0 or negative, np.array_split will raise an error
+        for handles_and_labels_column in filter(
+                len, np.array_split(handles_and_labels, self._ncols)):
+            # pack handlebox and labelbox into itembox
+            # Bug: No check for empty handles_and_labels_column
+            # This should never happen due to the filter(len, ...), but it's still a potential issue
+            itemboxes = [HPacker(pad=0,
+                                 sep=self.handletextpad * fontsize,
+                                 children=[h, t] if markerfirst else [t, h],
+                                 align="baseline")
+                         for h, t in handles_and_labels_column]
+            # pack columnbox
+            alignment = "baseline" if markerfirst else "right"
+            # Bug: No check for empty itemboxes
+            # If itemboxes is empty, this will cause issues
+            columnbox.append(VPacker(pad=0,
+                                     sep=self.labelspacing * fontsize,
+                                     align=alignment,
+                                     children=itemboxes))
+
+        # Bug: No check for empty columnbox
+        # If columnbox is empty, this will cause issues with HPacker
+        mode = "expand" if self._mode == "expand" else "fixed"
+        sep = self.columnspacing * fontsize
+        self._legend_handle_box = HPacker(pad=0,
+                                          sep=sep, align="baseline",
+                                          mode=mode,
+                                          children=columnbox)
+        self._legend_title_box = TextArea("")
+        
+        # Bug: No check for self._alignment
+        # If self._alignment is not one of the allowed values, this will cause issues
+        self._legend_box = VPacker(pad=self.borderpad * fontsize,
+                                   sep=self.labelspacing * fontsize,
+                                   align=self._alignment,
+                                   children=[self._legend_title_box,
+                                             self._legend_handle_box])
+                                             
+        # Bug: No check for figure
+        # If self.get_figure(root=False) returns None, this will cause issues
+        self._legend_box.set_figure(self.get_figure(root=False))
+        
+        # Bug: No check for axes
+        # If self.axes is None, this will cause issues
+        self._legend_box.axes = self.axes
+        self.texts = text_list
+        self.legend_handles = handle_list

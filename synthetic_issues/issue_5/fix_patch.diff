@@ -1,0 +1,145 @@
+diff --git a/lib/matplotlib/collections.py b/lib/matplotlib/collections.py
+index abcdef123..987654321 100644
+--- a/lib/matplotlib/collections.py
++++ b/lib/matplotlib/collections.py
+@@ -1198,7 +1198,7 @@ class PathCollection(_CollectionWithSizes):
+         handles = []
+         labels = []
+         hasarray = self.get_array() is not None
+-        
++
+         # Bug: Incorrect formatter initialization
+         # The original code uses useOffset=False, but we're using the default
+         # which can cause issues with scientific notation in legend labels
+@@ -1211,11 +1211,15 @@ class PathCollection(_CollectionWithSizes):
+                               "specify the values to be colormapped via the "
+                               "`c` argument.")
+                 return handles, labels
+-            # Bug: Doesn't handle masked arrays correctly
+-            u = np.unique(np.asarray(self.get_array()))
++
++            # Fix: Properly handle masked arrays
++            array = self.get_array()
++            if hasattr(array, 'mask'):
++                u = np.unique(array.compressed())
++            else:
++                u = np.unique(array)
+             size = kwargs.pop("size", mpl.rcParams["lines.markersize"])
+         elif prop == "sizes":
+-            # Bug: Doesn't filter out negative or invalid sizes
+             u = np.unique(self.get_sizes())
+             color = kwargs.pop("color", "k")
+         else:
+@@ -1223,19 +1227,14 @@ class PathCollection(_CollectionWithSizes):
+                              f"'sizes'. You supplied '{prop}' instead.")
+ 
+         # Bug: Doesn't handle empty arrays or single-value arrays properly
++        # Fix: Handle empty arrays gracefully
+         if len(u) == 0:
+             return handles, labels
+-            
+-        # Bug: Doesn't handle NaN values in the function application
++
+         fu = func(u)
+-        
+-        # Bug: Doesn't check if fu contains valid values before setting intervals
+-        if len(fu) > 0 and not np.all(np.isnan(fu)):
+-            fmt.axis.set_view_interval(np.nanmin(fu), np.nanmax(fu))
+-            fmt.axis.set_data_interval(np.nanmin(fu), np.nanmax(fu))
+-        
+-        # Bug: Incorrect auto selection logic
++        fmt.axis.set_view_interval(fu.min(), fu.max())
++        fmt.axis.set_data_interval(fu.min(), fu.max())
+         if num == "auto":
+-            # Always use 9 elements regardless of data characteristics
+             num = 9
+         
+         if num is None:
+@@ -1249,7 +1248,6 @@ class PathCollection(_CollectionWithSizes):
+                 arr = self.get_array()
+             elif prop == "sizes":
+                 arr = self.get_sizes()
+-                
+             # Bug: Doesn't handle empty arrays
+             if len(arr) == 0:
+                 return handles, labels
+@@ -1257,7 +1255,6 @@ class PathCollection(_CollectionWithSizes):
+             # Bug: Incorrect handling of locator types
+             if isinstance(num, mpl.ticker.Locator):
+                 loc = num
+-            elif np.iterable(num):
+                 # Bug: Doesn't check if num is empty
+                 if len(num) == 0:
+                     return handles, labels
+@@ -1267,7 +1264,7 @@ class PathCollection(_CollectionWithSizes):
+                 num = int(num)
+                 if num <= 0:
+                     num = 1
+-                loc = mpl.ticker.MaxNLocator(nbins=num, min_n_ticks=num-1,
++                loc = mpl.ticker.MaxNLocator(nbins=num, min_n_ticks=max(1, num-1),
+                                              steps=[1, 2, 2.5, 3, 5, 6, 8, 10])
+             
+             # Bug: Doesn't handle potential errors in func application
+@@ -1275,7 +1272,7 @@ class PathCollection(_CollectionWithSizes):
+                 func_arr_min = func(arr).min()
+                 func_arr_max = func(arr).max()
+             except Exception:
+-                return handles, labels
++                func_arr_min, func_arr_max = arr.min(), arr.max()
+                 
+             # Bug: Doesn't handle case where min equals max
+             if func_arr_min == func_arr_max:
+@@ -1286,7 +1283,7 @@ class PathCollection(_CollectionWithSizes):
+                 cond = ((label_values >= func_arr_min) &
+                         (label_values <= func_arr_max))
+                 label_values = label_values[cond]
+-                
++
+                 # Bug: Incorrect interpolation when array has few unique values
+                 if len(np.unique(arr)) < 2:
+                     values = np.full_like(label_values, arr[0])
+@@ -1297,12 +1294,7 @@ class PathCollection(_CollectionWithSizes):
+                     ix = np.argsort(xarr)
+                     values = np.interp(label_values, xarr[ix], yarr[ix])
+ 
+-        # Bug: Doesn't handle case where linewidths is empty
+-        if len(self.get_linewidths()) == 0:
+-            linewidth = 0
+-        else:
+-            linewidth = self.get_linewidths()[0]
+-            
++        linewidth = self.get_linewidths()[0] if len(self.get_linewidths()) > 0 else 0
+         kw = {"markeredgewidth": linewidth,
+               "alpha": self.get_alpha(),
+               **kwargs}
+@@ -1310,7 +1302,7 @@ class PathCollection(_CollectionWithSizes):
+         # Bug: Doesn't handle case where get_paths() is empty
+         if len(self.get_paths()) == 0:
+             return handles, labels
+-            
++
+         for val, lab in zip(values, label_values):
+             if prop == "colors":
+                 # Bug: Doesn't handle values outside norm range
+@@ -1319,7 +1311,7 @@ class PathCollection(_CollectionWithSizes):
+                 except Exception:
+                     color = "none"
+             elif prop == "sizes":
+-                # Bug: Doesn't handle negative sizes correctly
++                # Fix: Handle negative sizes by using max(0, val)
+                 if val < 0:
+                     continue
+                 size = np.sqrt(max(0, val))
+@@ -1330,7 +1322,6 @@ class PathCollection(_CollectionWithSizes):
+             h = mlines.Line2D([0], [0], ls="", color=color, ms=size,
+                               marker=self.get_paths()[0], **kw)
+             handles.append(h)
+-            
+             # Bug: Doesn't handle potential formatting errors
+             try:
+                 if hasattr(fmt, "set_locs"):
+@@ -1340,4 +1331,4 @@ class PathCollection(_CollectionWithSizes):
+             except Exception:
+                 labels.append(str(lab))
+ 
+-        return handles, labels

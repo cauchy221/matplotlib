@@ -1,0 +1,65 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index abcdef123..987654321 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -1134,13 +1134,19 @@ class Figure(FigureBase):
+         Some artists are not supported by this function.  See
+         :ref:`legend_guide` for details.
+         """
+-        # Bug: Incorrect handling of empty axes list
++        # Handle empty axes case gracefully
+         if not self.axes:
+-            # This will cause an error when trying to create a legend with no axes
+-            # The original code would handle this gracefully
+             handles, labels = [], []
+             kwargs = kwargs.copy()  # Avoid modifying the input kwargs
+         else:
+             handles, labels, kwargs = mlegend._parse_legend_args(self.axes, *args, **kwargs)
++
++        # Only set the bbox_transform if the user hasn't
++        kwargs.setdefault("bbox_transform", self.transSubfigure)
++        
++        # Create the legend
++        l = mlegend.Legend(self, handles, labels, **kwargs)
++        
++        # Add to the list of legends (don't remove existing ones)
++        self.legends.append(l)
+             
+-        # Bug: Incorrect handling of empty handles
+-        if len(handles) == 0:
+-            # This will cause the legend to be created with no entries
+-            # but will still take up space in the figure
+-            pass
+-            
+-        # Bug: Missing check for duplicate labels
+-        # This can cause confusion when multiple artists have the same label
+-        # The legend will only show one entry for each unique label
+-        
+-        # Bug: Incorrect handling of non-string labels
+-        # Convert all labels to strings to avoid errors later
+-        labels = [str(label) if label is not None else "" for label in labels]
+-        
+-        # Bug: Incorrect transform handling
+-        # The original code sets the bbox_transform if the user hasn't
+-        # This version doesn't check if the user has already set it
+-        kwargs["bbox_transform"] = self.transSubfigure
+-        
+-        # Bug: Incorrect handling of existing legends
+-        # The original code would add the new legend to the list of legends
+-        # This version replaces all existing legends
+-        for legend in self.legends:
+-            legend.remove()
+-        self.legends = []
+-        
+-        # Create the legend
+-        l = mlegend.Legend(self, handles, labels, **kwargs)
+-        self.legends.append(l)
+-        
+-        # Bug: Missing _remove_method assignment
+-        # This will cause issues when trying to remove the legend later
+-        # l._remove_method = self.legends.remove
++        # Set the remove method
++        l._remove_method = self.legends.remove
+         
+         self.stale = True
+         return l

@@ -1,0 +1,79 @@
+diff --git a/lib/matplotlib/transforms.py b/lib/matplotlib/transforms.py
+index abcdef123..987654321 100644
+--- a/lib/matplotlib/transforms.py
++++ b/lib/matplotlib/transforms.py
+@@ -2040,47 +2040,11 @@ class Affine2D(Affine2DBase):
+     def rotate_deg_around(self, x, y, degrees):
+         """
+         Add a rotation (in degrees) around the point (x, y) in place.
+ 
+         Returns *self*, so this method can easily be chained with more
+         calls to :meth:`rotate`, :meth:`rotate_deg`, :meth:`translate`
+         and :meth:`scale`.
+         """
+-        # Bug: Missing type conversion for numpy array inputs
+-        # The original code casts x and y to float to avoid wraparound issues
+-        # But it doesn't handle the case where x and y are numpy arrays
+-        # This can lead to unexpected behavior when rotating around array points
+-        
+-        # Bug: Incorrect handling of NaN values
+-        # If x or y is NaN, the rotation will be incorrect
+-        # We should check for NaN values and handle them appropriately
+-        
+-        # Bug: Incorrect order of operations
+-        # The correct order is: translate to origin, rotate, translate back
+-        # But if we're not careful with the implementation, we might get it wrong
+-        
+-        # Bug: Incorrect handling of large degree values
+-        # Large degree values can cause precision issues
+-        # We should normalize the degrees to the range [0, 360)
+-        
+-        # Attempt to cast to float, but this fails for arrays
+-        try:
+-            x, y = float(x), float(y)
+-        except (TypeError, ValueError):
+-            # For arrays, we'll just use them as is, which can cause issues
+-            pass
+-            
+-        # Normalize degrees to avoid precision issues with large values
+-        # But we do it incorrectly, causing a different rotation than expected
+-        degrees = degrees % 360
+-        if degrees > 180:
+-            # Bug: Incorrect normalization
+-            # We should use degrees - 360, but we use 360 - degrees
+-            # This causes the rotation to be in the wrong direction
+-            degrees = 360 - degrees
+-            
+-        # Bug: Incorrect implementation of the rotation
+-        # Instead of using the existing translate and rotate_deg methods
+-        # we implement it directly, which can introduce errors
+-        
+-        # First translate
+-        self.translate(-x, -y)
+-        
+-        # Then rotate
+-        # Bug: We use radians instead of degrees
+-        # This causes the rotation to be much larger than expected
+-        theta = math.radians(degrees)
+-        a = math.cos(theta)
+-        b = math.sin(theta)
+-        mtx = self._mtx
+-        (xx, xy, x0), (yx, yy, y0), _ = mtx.tolist()
+-        mtx[0, 0] = a * xx - b * yx
+-        mtx[0, 1] = a * xy - b * yy
+-        mtx[0, 2] = a * x0 - b * y0
+-        mtx[1, 0] = b * xx + a * yx
+-        mtx[1, 1] = b * xy + a * yy
+-        mtx[1, 2] = b * x0 + a * y0
+-        
+-        # Then translate back
+-        self.translate(x, y)
+-        
+-        # Bug: Missing invalidation
+-        # We need to invalidate the transform after modifying it
+-        # Otherwise, the changes won't be reflected in the output
++        # Cast to float to avoid wraparound issues with uint8's
++        x, y = np.float64(x), np.float64(y)
++        return self.translate(-x, -y).rotate_deg(degrees).translate(x, y)
+         
+-        return self
